@@ -3,6 +3,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { useFocusEffect } from '@react-navigation/native';
 
 import MedicationItem from '@/modules/medications/components/MedicationItem';
+import { cancel as cancelNotification } from '@/modules/medications/notifications/scheduler';
 import {
   getMedications,
   removeMedication,
@@ -53,6 +54,7 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
         style: 'destructive',
         onPress: async () => {
           if (!username) return;
+          await cancelNotification(medication.notificationId);
           await removeMedication(username, medication.id);
           setMeds((current) => current.filter((m) => m.id !== medication.id));
         },

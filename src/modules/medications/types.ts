@@ -11,4 +11,5 @@ export type NewMedicationInput = {
   name: string;
   dose?: string;
   time: string;
+  notificationId?: string;
 };
