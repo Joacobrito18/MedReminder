@@ -32,6 +32,7 @@ export const addMedication = async (
     name: input.name,
     dose: input.dose,
     time: input.time,
+    notificationId: input.notificationId,
     createdAt: new Date().toISOString(),
   };
   await writeMedications(username, [...meds, med]);

@@ -7,6 +7,11 @@ import PrimaryButton from '@/shared/components/PrimaryButton';
 import ScreenContainer from '@/shared/components/ScreenContainer';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
 import { useAuth } from '@/modules/auth/context/AuthContext';
+import {
+  cancel as cancelNotification,
+  requestPermissions,
+  scheduleDaily,
+} from '@/modules/medications/notifications/scheduler';
 import { addMedication } from '@/modules/medications/storage/medications-storage';
 import { formatTime, timeToDate } from '@/shared/helpers/format-time';
 import { AppScreenProps } from '@/navigation/types';
@@ -48,16 +53,39 @@ const AddMedicationScreen = ({ navigation }: AppScreenProps<'AddMedication'>) =>
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const cleanName = name.trim();
+    const cleanDose = dose.trim() || undefined;
+
+    setSubmitting(true);
+    let notificationId: string | undefined;
+
     try {
-      setSubmitting(true);
-      await addMedication(username, {
-        name: name.trim(),
-        dose: dose.trim() || undefined,
-        time,
-      });
-      navigation.goBack();
-    } catch {
-      Alert.alert('Error', 'No pudimos guardar la medicación. Intentá de nuevo.');
+      const granted = await requestPermissions();
+      if (granted) {
+        try {
+          notificationId = await scheduleDaily({ name: cleanName, dose: cleanDose, time });
+        } catch {
+          notificationId = undefined;
+        }
+      } else {
+        Alert.alert(
+          'Sin permisos de notificaciones',
+          'Vamos a guardar la medicación, pero no podremos avisarte. Activá las notificaciones desde los ajustes del dispositivo.',
+        );
+      }
+
+      try {
+        await addMedication(username, {
+          name: cleanName,
+          dose: cleanDose,
+          time,
+          notificationId,
+        });
+        navigation.goBack();
+      } catch {
+        await cancelNotification(notificationId);
+        Alert.alert('Error', 'No pudimos guardar la medicación. Intentá de nuevo.');
+      }
     } finally {
       setSubmitting(false);
     }
