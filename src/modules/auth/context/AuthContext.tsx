@@ -43,9 +43,7 @@ export const AuthProvider = ({ children }: Props) => {
         setSignedIn(user);
       },
       signUp: async (username, password) => {
-        const user = await createUser(username, password);
-        await saveSession(user.username);
-        setSignedIn(user);
+        await createUser(username, password);
       },
       signOut: async () => {
         await clearSession();

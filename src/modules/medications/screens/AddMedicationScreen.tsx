@@ -1,18 +1,28 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Feather from '@expo/vector-icons/Feather';
 
 import FormInput from '@/shared/components/FormInput';
 import ScreenContainer from '@/shared/components/ScreenContainer';
+import { useToast } from '@/shared/components/Toast';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import {
-  cancel as cancelNotification,
+  cancelMany,
+  nextScheduledDate,
   requestPermissions,
-  scheduleDaily,
+  scheduleForDays,
   scheduleOneShot,
-  tomorrowAt,
 } from '@/modules/medications/notifications/scheduler';
 import {
   addMedication,
@@ -20,7 +30,7 @@ import {
   removeMedication,
   updateMedication,
 } from '@/modules/medications/storage/medications-storage';
-import { NotificationKind } from '@/modules/medications/types';
+import { ALL_DAYS, NotificationKind } from '@/modules/medications/types';
 import { wasTakenToday } from '@/shared/helpers/date';
 import { formatTime, timeToDate } from '@/shared/helpers/format-time';
 import { AppScreenProps } from '@/navigation/types';
@@ -28,13 +38,25 @@ import { AppScreenProps } from '@/navigation/types';
 const DEFAULT_TIME = '08:00';
 const TIME_PATTERN = /^\d{2}:\d{2}$/;
 
+const DAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: 'L' },
+  { value: 2, label: 'M' },
+  { value: 3, label: 'M' },
+  { value: 4, label: 'J' },
+  { value: 5, label: 'V' },
+  { value: 6, label: 'S' },
+  { value: 0, label: 'D' },
+];
+
 type FieldErrors = {
   name?: string;
   time?: string;
+  days?: string;
 };
 
 const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedication'>) => {
   const { state } = useAuth();
+  const { showToast } = useToast();
   const username = state.status === 'signedIn' ? state.user.username : null;
   const editingId = route.params?.medicationId;
   const isEditing = Boolean(editingId);
@@ -42,12 +64,25 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
   const [name, setName] = useState('');
   const [dose, setDose] = useState('');
   const [time, setTime] = useState(DEFAULT_TIME);
+  const [days, setDays] = useState<number[]>(ALL_DAYS);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(isEditing);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [originalNotificationId, setOriginalNotificationId] = useState<string | undefined>();
+  const [originalNotificationIds, setOriginalNotificationIds] = useState<string[] | undefined>();
   const [originalLastTakenAt, setOriginalLastTakenAt] = useState<string | undefined>();
+
+  const allSelected = days.length === 7;
+  const sortedDays = [...days].sort((a, b) => a - b);
+
+  const toggleDay = (value: number) => {
+    setDays((current) =>
+      current.includes(value) ? current.filter((d) => d !== value) : [...current, value],
+    );
+    if (errors.days) setErrors((prev) => ({ ...prev, days: undefined }));
+  };
+
+  const toggleAllDays = () => setDays(allSelected ? [] : ALL_DAYS);
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -68,7 +103,8 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
       setName(med.name);
       setDose(med.dose ?? '');
       setTime(med.time);
-      setOriginalNotificationId(med.notificationId);
+      setDays(med.days.length > 0 ? med.days : ALL_DAYS);
+      setOriginalNotificationIds(med.notificationIds);
       setOriginalLastTakenAt(med.lastTakenAt);
       setLoading(false);
     };
@@ -93,14 +129,16 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
     const nextErrors: FieldErrors = {};
     if (!name.trim()) nextErrors.name = 'Ingresá el nombre';
     if (!TIME_PATTERN.test(time)) nextErrors.time = 'Hora inválida';
+    if (days.length === 0) nextErrors.days = 'Elegí al menos un día';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     const cleanName = name.trim();
     const cleanDose = dose.trim() || undefined;
+    const cleanDays = sortedDays;
 
     setSubmitting(true);
-    let newNotificationId: string | undefined;
+    let newNotificationIds: string[] = [];
     let newKind: NotificationKind | undefined;
     const skipToday = isEditing && wasTakenToday(originalLastTakenAt);
 
@@ -109,17 +147,21 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
       if (granted) {
         try {
           if (skipToday) {
-            newNotificationId = await scheduleOneShot(
+            const id = await scheduleOneShot(
               { name: cleanName, dose: cleanDose, time },
-              tomorrowAt(time),
+              nextScheduledDate(time, cleanDays),
             );
+            newNotificationIds = [id];
             newKind = 'oneshot';
           } else {
-            newNotificationId = await scheduleDaily({ name: cleanName, dose: cleanDose, time });
-            newKind = 'daily';
+            newNotificationIds = await scheduleForDays(
+              { name: cleanName, dose: cleanDose, time, days: cleanDays },
+              cleanDays,
+            );
+            newKind = newNotificationIds.length > 0 ? 'weekly' : undefined;
           }
         } catch {
-          newNotificationId = undefined;
+          newNotificationIds = [];
           newKind = undefined;
         }
       } else {
@@ -135,22 +177,26 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
             name: cleanName,
             dose: cleanDose,
             time,
-            notificationId: newNotificationId,
+            days: cleanDays,
+            notificationIds: newNotificationIds,
             notificationKind: newKind,
           });
-          await cancelNotification(originalNotificationId);
+          await cancelMany(originalNotificationIds);
+          showToast('Cambios guardados');
         } else {
           await addMedication(username, {
             name: cleanName,
             dose: cleanDose,
             time,
-            notificationId: newNotificationId,
+            days: cleanDays,
+            notificationIds: newNotificationIds,
             notificationKind: newKind,
           });
+          showToast('Recordatorio agregado');
         }
         navigation.goBack();
       } catch {
-        await cancelNotification(newNotificationId);
+        await cancelMany(newNotificationIds);
         Alert.alert('Error', 'No pudimos guardar la medicación. Intentá de nuevo.');
       }
     } finally {
@@ -166,8 +212,9 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
-          await cancelNotification(originalNotificationId);
+          await cancelMany(originalNotificationIds);
           await removeMedication(username, editingId);
+          showToast('Recordatorio eliminado', 'info');
           navigation.goBack();
         },
       },
@@ -238,7 +285,10 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
 
             <Text style={styles.timeLabel}>Hora del recordatorio</Text>
             <Pressable
-              onPress={() => setPickerVisible((current) => !current)}
+              onPress={() => {
+                Keyboard.dismiss();
+                setPickerVisible((current) => !current);
+              }}
               accessibilityLabel="Elegir hora del recordatorio"
               style={({ pressed }) => [
                 styles.timeHero,
@@ -248,7 +298,7 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.timeHeroValue}>{time}</Text>
-                <Text style={styles.timeHeroHint}>Tocá para cambiar — todos los días</Text>
+                <Text style={styles.timeHeroHint}>Tocá para cambiar</Text>
               </View>
               <View style={styles.timeHeroIcon}>
                 <Feather name="clock" size={22} color={colors.textOnPrimary} />
@@ -265,6 +315,42 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
                 onChange={handleTimeChange}
               />
             ) : null}
+
+            <View style={styles.daysHeader}>
+              <Text style={styles.daysLabel}>Días de la semana</Text>
+              <Pressable
+                onPress={toggleAllDays}
+                accessibilityLabel={allSelected ? 'Quitar todos los días' : 'Seleccionar todos los días'}
+                style={({ pressed }) => [styles.daysToggle, pressed && styles.pressedSubtle]}
+              >
+                <Text style={styles.daysToggleLabel}>
+                  {allSelected ? 'Ninguno' : 'Todos'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.daysRow}>
+              {DAY_OPTIONS.map((opt) => {
+                const selected = days.includes(opt.value);
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => toggleDay(opt.value)}
+                    accessibilityLabel={`Día ${opt.label}`}
+                    accessibilityState={{ selected }}
+                    style={({ pressed }) => [
+                      styles.dayChip,
+                      selected && styles.dayChipSelected,
+                      pressed && styles.pressedSubtle,
+                    ]}
+                  >
+                    <Text style={[styles.dayChipLabel, selected && styles.dayChipLabelSelected]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {errors.days ? <Text style={styles.error}>{errors.days}</Text> : null}
           </View>
         </ScrollView>
       )}
@@ -422,6 +508,60 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontSize: fontSize.xs,
     color: colors.danger,
+  },
+  daysHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg + 4,
+    marginBottom: spacing.sm,
+  },
+  daysLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textSoft,
+  },
+  daysToggle: {
+    height: 30,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  daysToggleLabel: {
+    fontSize: fontSize.xs + 1,
+    fontWeight: fontWeight.semibold,
+    color: colors.textSoft,
+    letterSpacing: 0.2,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  dayChip: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  dayChipLabel: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.textSoft,
+  },
+  dayChipLabelSelected: {
+    color: colors.textOnPrimary,
   },
   footer: {
     paddingHorizontal: spacing.xl,

@@ -15,6 +15,7 @@ const minutesUntilTime = (time: string, now: Date): number => {
 
 export const getMedicationStatus = (med: Medication, now: Date = new Date()): MedicationStatus => {
   if (wasTakenToday(med.lastTakenAt)) return 'taken';
+  if (!med.days.includes(now.getDay())) return 'pending';
   const minutes = minutesUntilTime(med.time, now);
   if (minutes >= 0 && minutes <= DUE_SOON_WINDOW_MINUTES) return 'due-soon';
   return 'pending';

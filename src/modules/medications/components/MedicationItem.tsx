@@ -11,6 +11,7 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { Medication } from '@/modules/medications/types';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
+import { formatDays } from '@/shared/helpers/format-days';
 import {
   dueInLabel,
   formatTakenAt,
@@ -151,6 +152,9 @@ const MedicationItem = ({ medication, onDelete, onEdit, onToggleTaken }: Props) 
               <Text style={styles.dose} numberOfLines={1}>
                 {medication.dose ?? 'Sin dosis indicada'}
               </Text>
+              <Text style={styles.days} numberOfLines={1}>
+                {formatDays(medication.days)}
+              </Text>
             </View>
 
             <Pressable
@@ -289,6 +293,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm + 1,
     color: colors.textMuted,
     fontWeight: fontWeight.regular,
+  },
+  days: {
+    fontSize: fontSize.xs,
+    color: colors.textMutedSoft,
+    fontWeight: fontWeight.medium,
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
   check: {
     width: 44,

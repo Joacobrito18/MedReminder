@@ -14,10 +14,10 @@ import Feather from '@expo/vector-icons/Feather';
 import DayBanner from '@/modules/medications/components/DayBanner';
 import MedicationItem from '@/modules/medications/components/MedicationItem';
 import {
-  cancel as cancelNotification,
-  scheduleDaily,
+  cancelMany,
+  nextScheduledDate,
+  scheduleForDays,
   scheduleOneShot,
-  tomorrowAt,
 } from '@/modules/medications/notifications/scheduler';
 import {
   getMedications,
@@ -27,6 +27,7 @@ import {
 import { Medication, NotificationKind } from '@/modules/medications/types';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import ScreenContainer from '@/shared/components/ScreenContainer';
+import { useToast } from '@/shared/components/Toast';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
 import { wasTakenToday } from '@/shared/helpers/date';
 import { AppScreenProps } from '@/navigation/types';
@@ -46,16 +47,16 @@ const reconcileNotifications = async (
       result.push(med);
       continue;
     }
-    await cancelNotification(med.notificationId);
-    let newId: string | undefined;
+    await cancelMany(med.notificationIds);
+    let newIds: string[] = [];
     try {
-      newId = await scheduleDaily(med);
+      newIds = await scheduleForDays(med, med.days);
     } catch {
-      newId = undefined;
+      newIds = [];
     }
     const updated = await updateMedication(username, med.id, {
-      notificationId: newId,
-      notificationKind: newId ? 'daily' : undefined,
+      notificationIds: newIds,
+      notificationKind: newIds.length > 0 ? 'weekly' : undefined,
     });
     result.push(updated ?? med);
   }
@@ -64,6 +65,7 @@ const reconcileNotifications = async (
 
 const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
   const { state, signOut } = useAuth();
+  const { showToast } = useToast();
   const username = state.status === 'signedIn' ? state.user.username : null;
 
   const [meds, setMeds] = useState<Medication[]>([]);
@@ -101,9 +103,10 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
         style: 'destructive',
         onPress: async () => {
           if (!username) return;
-          await cancelNotification(medication.notificationId);
+          await cancelMany(medication.notificationIds);
           await removeMedication(username, medication.id);
           setMeds((current) => current.filter((m) => m.id !== medication.id));
+          showToast('Recordatorio eliminado', 'info');
         },
       },
     ]);
@@ -117,25 +120,29 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
     if (!username) return;
     const willBeTaken = !wasTakenToday(medication.lastTakenAt);
 
-    await cancelNotification(medication.notificationId);
-    let newId: string | undefined;
+    await cancelMany(medication.notificationIds);
+    let newIds: string[] = [];
     let newKind: NotificationKind | undefined;
     try {
       if (willBeTaken) {
-        newId = await scheduleOneShot(medication, tomorrowAt(medication.time));
+        const id = await scheduleOneShot(
+          medication,
+          nextScheduledDate(medication.time, medication.days),
+        );
+        newIds = [id];
         newKind = 'oneshot';
       } else {
-        newId = await scheduleDaily(medication);
-        newKind = 'daily';
+        newIds = await scheduleForDays(medication, medication.days);
+        newKind = newIds.length > 0 ? 'weekly' : undefined;
       }
     } catch {
-      newId = undefined;
+      newIds = [];
       newKind = undefined;
     }
 
     const updated = await updateMedication(username, medication.id, {
       lastTakenAt: willBeTaken ? new Date().toISOString() : undefined,
-      notificationId: newId,
+      notificationIds: newIds,
       notificationKind: newKind,
     });
     if (!updated) return;

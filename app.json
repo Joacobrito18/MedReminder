@@ -1,38 +1,38 @@
 {
   "expo": {
-    "name": "medreminder",
+    "name": "MedReminder",
     "slug": "medreminder",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./brand/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./brand/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./brand/adaptive-icon.png",
+        "backgroundColor": "#2A4A87"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./brand/favicon.png"
     },
     "plugins": [
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#2F6FED"
+          "icon": "./brand/icon.png",
+          "color": "#2A4A87"
         }
       ]
     ]

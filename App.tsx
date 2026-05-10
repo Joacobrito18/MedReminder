@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/modules/auth/context/AuthContext';
 import { setupAndroidChannel } from '@/modules/medications/notifications/scheduler';
 import RootNavigator from '@/navigation/RootNavigator';
+import { ToastProvider } from '@/shared/components/Toast';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,10 +24,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </AuthProvider>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,18 +1,43 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { Medication, NewMedicationInput } from '@/modules/medications/types';
+import { ALL_DAYS, Medication, NewMedicationInput } from '@/modules/medications/types';
 import { generateId } from '@/shared/helpers/generate-id';
 
 const KEY_PREFIX = '@medreminder:meds:';
 
 const keyFor = (username: string): string => `${KEY_PREFIX}${username}`;
 
+type LegacyMedication = Medication & {
+  notificationId?: string;
+};
+
+const migrate = (raw: LegacyMedication): Medication => {
+  const days = Array.isArray(raw.days) && raw.days.length > 0 ? raw.days : ALL_DAYS;
+  const notificationIds = Array.isArray(raw.notificationIds)
+    ? raw.notificationIds
+    : raw.notificationId
+      ? [raw.notificationId]
+      : [];
+  return {
+    id: raw.id,
+    name: raw.name,
+    dose: raw.dose,
+    time: raw.time,
+    days,
+    notificationIds,
+    notificationKind: raw.notificationKind,
+    lastTakenAt: raw.lastTakenAt,
+    createdAt: raw.createdAt,
+  };
+};
+
 export const getMedications = async (username: string): Promise<Medication[]> => {
   const raw = await AsyncStorage.getItem(keyFor(username));
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Medication[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as LegacyMedication[]).map(migrate);
   } catch {
     return [];
   }
@@ -32,7 +57,8 @@ export const addMedication = async (
     name: input.name,
     dose: input.dose,
     time: input.time,
-    notificationId: input.notificationId,
+    days: input.days,
+    notificationIds: input.notificationIds,
     notificationKind: input.notificationKind,
     createdAt: new Date().toISOString(),
   };
