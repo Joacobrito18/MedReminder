@@ -70,6 +70,58 @@ La primera vez te pide instalar `@expo/ngrok` — aceptá. El bundle es un poco 
 3. **Home** — lista de medicaciones del usuario logueado, FAB para agregar, header con saludo y botón de salir.
 4. **Alta / Edición** — form con nombre, dosis (opcional), hora (TimePicker nativo).
 
+## Cómo usar la app
+
+### 1. Crear tu cuenta
+
+La primera vez que abrís la app vas a ver la pantalla de **Login**.
+
+- Tocá **"¿Primera vez? Crear cuenta"** abajo.
+- Elegí un nombre de usuario y una contraseña de mínimo 4 caracteres. Confirmala.
+- Tocá **Crear cuenta**. Te lleva directo al Home logueado.
+
+> Los datos se guardan **solo en este teléfono** (AsyncStorage). No hay servidor, no se sincroniza con nada.
+
+### 2. Permitir notificaciones
+
+Apenas entrás al Home, Android te va a pedir permiso para enviar notificaciones. **Aceptá** — sin esto los recordatorios no van a sonar.
+
+Si lo rechazaste sin querer, andá a Ajustes del celular → Apps → Expo Go → Notificaciones, y activalas.
+
+### 3. Agregar tu primera medicación
+
+- En el Home, tocá el **botón azul redondo (+)** abajo a la derecha.
+- Completá:
+  - **Nombre** (obligatorio): ej. "Ibuprofeno".
+  - **Dosis** (opcional): ej. "400mg" o "1 comprimido".
+  - **Hora**: tocá el reloj para abrir el TimePicker nativo y elegí la hora.
+- Tocá **Guardar**. Vuelve al Home y la medicación aparece en la lista, ordenada por hora.
+
+> **Tip para probar las notis ya:** poné una hora 2-3 minutos en el futuro, bloqueá el celu, y esperá.
+
+### 4. Marcar una medicación como tomada
+
+En cada card del Home, a la derecha hay un **botón circular con check**.
+
+- Tocalo cuando tomes la medicación. La card se pone gris, el nombre tachado y aparece **"✓ HH:MM"** abajo de la hora.
+- La notificación diaria de hoy queda **cancelada automáticamente** y se programa una sola para mañana a la misma hora. No te va a molestar de nuevo hoy.
+- Si tocás el check de vuelta, se desmarca.
+
+### 5. Editar o eliminar una medicación
+
+**Editar:** tocá la card (no el check) → se abre el form con los datos cargados → modificá → Guardar.
+
+**Eliminar:** dos formas:
+
+- **Swipe a la izquierda** sobre la card → aparece el botón rojo **Eliminar** → tocalo.
+- O abrí la card en modo edición → tocá el ícono de **basurero** arriba a la derecha → confirmá.
+
+Al eliminar se cancela la notificación programada también.
+
+### 6. Cerrar sesión
+
+Arriba a la derecha del Home hay un botón **Salir**. Te devuelve al Login. Tu cuenta y medicaciones quedan guardadas para la próxima vez.
+
 ## Demo
 
 _Pendiente — link al video de YouTube (≤ 1 min) cuando esté listo._
