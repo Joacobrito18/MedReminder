@@ -1,22 +1,66 @@
-import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import Feather from '@expo/vector-icons/Feather';
 
+import DayBanner from '@/modules/medications/components/DayBanner';
 import MedicationItem from '@/modules/medications/components/MedicationItem';
-import { cancel as cancelNotification } from '@/modules/medications/notifications/scheduler';
+import {
+  cancel as cancelNotification,
+  scheduleDaily,
+  scheduleOneShot,
+  tomorrowAt,
+} from '@/modules/medications/notifications/scheduler';
 import {
   getMedications,
   removeMedication,
+  updateMedication,
 } from '@/modules/medications/storage/medications-storage';
-import { Medication } from '@/modules/medications/types';
+import { Medication, NotificationKind } from '@/modules/medications/types';
 import { useAuth } from '@/modules/auth/context/AuthContext';
-import PrimaryButton from '@/shared/components/PrimaryButton';
 import ScreenContainer from '@/shared/components/ScreenContainer';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
+import { wasTakenToday } from '@/shared/helpers/date';
 import { AppScreenProps } from '@/navigation/types';
 
 const sortByTime = (list: Medication[]): Medication[] =>
   [...list].sort((a, b) => a.time.localeCompare(b.time));
+
+const reconcileNotifications = async (
+  username: string,
+  meds: Medication[],
+): Promise<Medication[]> => {
+  const result: Medication[] = [];
+  for (const med of meds) {
+    const isStaleOneShot =
+      med.notificationKind === 'oneshot' && !wasTakenToday(med.lastTakenAt);
+    if (!isStaleOneShot) {
+      result.push(med);
+      continue;
+    }
+    await cancelNotification(med.notificationId);
+    let newId: string | undefined;
+    try {
+      newId = await scheduleDaily(med);
+    } catch {
+      newId = undefined;
+    }
+    const updated = await updateMedication(username, med.id, {
+      notificationId: newId,
+      notificationKind: newId ? 'daily' : undefined,
+    });
+    result.push(updated ?? med);
+  }
+  return result;
+};
 
 const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
   const { state, signOut } = useAuth();
@@ -34,9 +78,12 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
           setLoading(false);
           return;
         }
+        setLoading(true);
         const list = await getMedications(username);
         if (!active) return;
-        setMeds(sortByTime(list));
+        const reconciled = await reconcileNotifications(username, list);
+        if (!active) return;
+        setMeds(sortByTime(reconciled));
         setLoading(false);
       };
       load();
@@ -62,51 +109,119 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
     ]);
   };
 
+  const handleEdit = (medication: Medication) => {
+    navigation.navigate('AddMedication', { medicationId: medication.id });
+  };
+
+  const handleToggleTaken = async (medication: Medication) => {
+    if (!username) return;
+    const willBeTaken = !wasTakenToday(medication.lastTakenAt);
+
+    await cancelNotification(medication.notificationId);
+    let newId: string | undefined;
+    let newKind: NotificationKind | undefined;
+    try {
+      if (willBeTaken) {
+        newId = await scheduleOneShot(medication, tomorrowAt(medication.time));
+        newKind = 'oneshot';
+      } else {
+        newId = await scheduleDaily(medication);
+        newKind = 'daily';
+      }
+    } catch {
+      newId = undefined;
+      newKind = undefined;
+    }
+
+    const updated = await updateMedication(username, medication.id, {
+      lastTakenAt: willBeTaken ? new Date().toISOString() : undefined,
+      notificationId: newId,
+      notificationKind: newKind,
+    });
+    if (!updated) return;
+    setMeds((current) => current.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
   const goToAdd = () => navigation.navigate('AddMedication');
 
   const isEmpty = !loading && meds.length === 0;
+  const takenCount = useMemo(
+    () => meds.filter((m) => wasTakenToday(m.lastTakenAt)).length,
+    [meds],
+  );
 
   return (
     <ScreenContainer padded={false}>
-      <View style={styles.padded}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hola,</Text>
-            <Text style={styles.username}>{username ?? ''}</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>BUEN DÍA</Text>
+          <Text style={styles.username} numberOfLines={1}>
+            {username ?? ''}
+          </Text>
+        </View>
+        <Pressable
+          onPress={signOut}
+          accessibilityLabel="Cerrar sesión"
+          style={({ pressed }) => [styles.logout, pressed && styles.logoutPressed]}
+          hitSlop={6}
+        >
+          <Feather name="log-out" size={14} color={colors.textSoft} />
+          <Text style={styles.logoutLabel}>Salir</Text>
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : isEmpty ? (
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <Feather name="calendar" size={34} color={colors.primary} />
           </View>
-          <Pressable onPress={signOut} style={styles.logout} hitSlop={8}>
-            <Text style={styles.logoutLabel}>Salir</Text>
+          <Text style={styles.emptyTitle}>Empezá tu agenda</Text>
+          <Text style={styles.emptyBody}>
+            Agregá tu primera medicación. Te avisamos a la hora exacta, todos los días.
+          </Text>
+          <Pressable
+            onPress={goToAdd}
+            accessibilityLabel="Agregar medicación"
+            style={({ pressed }) => [styles.emptyCta, pressed && styles.emptyCtaPressed]}
+          >
+            <Feather name="plus" size={18} color={colors.textOnPrimary} />
+            <Text style={styles.emptyCtaLabel}>Agregar medicación</Text>
           </Pressable>
         </View>
-
-        {isEmpty ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Aún no tenés medicaciones</Text>
-            <Text style={styles.emptyBody}>
-              Agregá tu primera medicación y vamos a recordarte la hora de tomarla.
-            </Text>
-            <PrimaryButton label="Agregar medicación" onPress={goToAdd} style={styles.cta} />
+      ) : (
+        <>
+          <DayBanner taken={takenCount} total={meds.length} />
+          <View style={styles.sectionLabelWrap}>
+            <Text style={styles.sectionLabel}>HOY</Text>
           </View>
-        ) : (
           <FlatList
             data={meds}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <MedicationItem medication={item} onDelete={handleDelete} />
+              <MedicationItem
+                medication={item}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                onToggleTaken={handleToggleTaken}
+              />
             )}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
-        )}
-      </View>
+        </>
+      )}
 
-      {!isEmpty ? (
+      {!isEmpty && !loading ? (
         <Pressable
           onPress={goToAdd}
           accessibilityLabel="Agregar medicación"
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         >
-          <Text style={styles.fabIcon}>+</Text>
+          <Feather name="plus" size={26} color={colors.textOnPrimary} />
         </Pressable>
       ) : null}
     </ScreenContainer>
@@ -116,84 +231,128 @@ const HomeScreen = ({ navigation }: AppScreenProps<'Home'>) => {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  padded: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
   greeting: {
     fontSize: fontSize.sm,
     color: colors.textMuted,
+    letterSpacing: 0.6,
+    fontWeight: fontWeight.medium,
+    marginBottom: 2,
   },
   username: {
-    fontSize: fontSize.xl,
+    fontSize: 28,
     fontWeight: fontWeight.bold,
     color: colors.text,
+    letterSpacing: -0.6,
+    lineHeight: 32,
   },
   logout: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    height: 38,
+    paddingHorizontal: spacing.md + 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  logoutPressed: {
+    opacity: 0.7,
   },
   logoutLabel: {
-    color: colors.primary,
-    fontWeight: fontWeight.semibold,
-    fontSize: fontSize.sm,
+    color: colors.textSoft,
+    fontWeight: fontWeight.medium,
+    fontSize: fontSize.sm + 1,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl - 2,
   },
   emptyTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
     color: colors.text,
+    letterSpacing: -0.4,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptyBody: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    lineHeight: 22,
+    marginBottom: spacing.xl + 2,
   },
-  cta: {
-    alignSelf: 'stretch',
+  emptyCta: {
+    height: 52,
+    paddingHorizontal: spacing.xl - 2,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyCtaPressed: {
+    opacity: 0.85,
+  },
+  emptyCtaLabel: {
+    color: colors.textOnPrimary,
+    fontSize: fontSize.md + 1,
+    fontWeight: fontWeight.semibold,
+  },
+  sectionLabelWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  sectionLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.textMuted,
+    letterSpacing: 1,
   },
   list: {
-    paddingBottom: spacing.xxl + 56,
+    paddingBottom: spacing.xxxl + 60,
   },
   fab: {
     position: 'absolute',
     right: spacing.lg,
-    bottom: spacing.xl,
-    width: 56,
-    height: 56,
+    bottom: spacing.xl + 8,
+    width: 60,
+    height: 60,
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
   fabPressed: {
-    opacity: 0.85,
-  },
-  fabIcon: {
-    color: colors.textOnPrimary,
-    fontSize: 30,
-    lineHeight: 32,
-    fontWeight: fontWeight.bold,
+    opacity: 0.9,
   },
 });

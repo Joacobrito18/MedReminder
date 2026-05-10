@@ -1,60 +1,74 @@
 # MedReminder
 
 App mobile para el Parcial 1 de Aplicaciones Móviles (ISTEA, 2026).
-
-**Opción elegida:** Recordatorio de medicación.
-
-## Stack
-
-- Expo SDK 54 + React Native 0.81
-- TypeScript (strict)
-- React Navigation (Native Stack)
-- AsyncStorage para persistencia
-- expo-notifications para recordatorios locales
-- React Context API para sesión
-
-## Estructura
-
-Organización por feature en `src/modules/` + `src/shared/` para lo transversal. Detalle completo en [ROADMAP.md](./ROADMAP.md).
-
-```
-src/
-  modules/
-    auth/         # context, screens, storage, types
-    medications/  # screens, components, storage, notifications
-  navigation/     # RootNavigator + AuthStack + AppStack
-  shared/         # components, constants/theme, helpers
-```
-
-Alias `@/` apunta a `src/` (configurado en `tsconfig.json` + `babel.config.js`).
-
-## Cómo correr
-
-Requisitos: Node 20+, npm, Expo Go en el celular **o** un emulador Android/iOS.
-
-```bash
-npm install
-npx expo start
-```
-
-Escanear el QR con Expo Go (Android) o la app de cámara (iOS).
-
-> ⚠️ Las notificaciones programadas requieren un build de development en SDK 54 (no funcionan en Expo Go en todos los casos). Para probarlas: `npx expo run:android`.
+La opcion que elegi fue Recordatorio de medicación.
 
 ## Funcionalidades
 
-Estado actual al 2026-05-08 (Día 1 del roadmap):
+- Registro y login local.
+- Sesión persistente: la app recuerda al usuario hasta que cierre sesión.
+- Navegación condicional: si no hay sesión, solo se ven las pantallas de auth.
+- CRUD de medicaciones (nombre, dosis opcional, hora del recordatorio).
+- Lista ordenada por hora con FAB para agregar.
+- Edición tocando una medicación (reutiliza la pantalla de alta).
+- Eliminación con confirmación (`Alert.alert`).
+- Marcar "tomada hoy" con feedback visual.
+- **Notificación local diaria** programada por cada medicación a su hora.
+- Skip inteligente: al marcar como tomada, se cancela la noti diaria y se programa una sola para mañana. Al día siguiente se restaura la diaria automáticamente.
+- Cancelación automática de la notificación al eliminar la medicación.
+- Reprogramación al editar (cancela la noti vieja, crea una nueva).
+- Permisos manejados con mensaje amigable si el usuario los rechaza.
 
-- [x] Setup inicial con TS + alias `@/`.
-- [x] Estructura por feature (`modules/auth`, `modules/medications`, `shared`).
-- [x] Auth local con AsyncStorage (registro, login, sesión persistente, logout).
-- [x] Navegación condicional Auth/App según sesión.
-- [x] Componentes reutilizables: `PrimaryButton`, `FormInput`, `ScreenContainer`.
-- [ ] CRUD de medicaciones (Día 2).
-- [ ] Notificaciones locales (Día 3).
-- [ ] Pulido de UI + extras (Día 4).
+## Cómo correr
 
-Plan completo y por días en [ROADMAP.md](./ROADMAP.md).
+### Requisitos
+
+- Node 20+
+- pnpm 10 (o npm — ver nota)
+- Expo Go en el celular físico (Android o iOS), conectado a la **misma Wi-Fi** que la PC
+
+### Instalación
+
+```bash
+pnpm install
+```
+
+> El proyecto incluye `.npmrc` con `node-linker=hoisted` para evitar problemas con symlinks de pnpm en Metro/React Native. 
+> De todas formas si preferís npm: `npm install` también funciona.
+
+### Levantar el dev server
+
+```bash
+pnpm start
+```
+
+Escanear el QR con Expo Go. La primera vez que abras la app te va a pedir permiso para enviar notificaciones — aceptá si querés probar los recordatorios.
+
+### Si falla la conexión LAN (timeout en Expo Go)
+
+```bash
+pnpm exec expo start --tunnel
+```
+
+EN MI CASO SIEMPRE OPTO DIRECTAMENTE POR LA VERSION --TUNNEL. NUNCA PUDE USARLO DE OTRA FORMA PARA VERLO EN EL CEL
+
+La primera vez te pide instalar `@expo/ngrok` — aceptá. El bundle es un poco más lento pero funciona detrás de cualquier firewall.
+
+### Probar notificaciones
+
+1. Crear una medicación con hora **2-3 minutos en el futuro** desde la hora del celular.
+2. Aceptar el permiso de notificaciones.
+3. Bloquear la pantalla del celular (las notis se ven mejor con la app fuera de foreground).
+4. Esperar hasta la hora configurada → debería llegar la notificación local.
+
+> Las **notificaciones locales programadas funcionan en Expo Go** en SDK 54. Lo que dejó de funcionar en Expo Go fueron las push remotas (no las usamos acá).
+
+## Pantallas
+
+1. **Login** — usuario + contraseña; link a registro.
+2. **Registro** — usuario, contraseña, confirmación; valida unicidad y mínimo 4 caracteres.
+3. **Home** — lista de medicaciones del usuario logueado, FAB para agregar, header con saludo y botón de salir.
+4. **Alta / Edición** — form con nombre, dosis (opcional), hora (TimePicker nativo).
 
 ## Demo
 

@@ -33,6 +33,7 @@ export const addMedication = async (
     dose: input.dose,
     time: input.time,
     notificationId: input.notificationId,
+    notificationKind: input.notificationKind,
     createdAt: new Date().toISOString(),
   };
   await writeMedications(username, [...meds, med]);
@@ -60,4 +61,18 @@ export const updateMedication = async (
   next[idx] = updated;
   await writeMedications(username, next);
   return updated;
+};
+
+export const markMedicationTaken = async (
+  username: string,
+  id: string,
+): Promise<Medication | null> =>
+  updateMedication(username, id, { lastTakenAt: new Date().toISOString() });
+
+export const findMedication = async (
+  username: string,
+  id: string,
+): Promise<Medication | null> => {
+  const meds = await getMedications(username);
+  return meds.find((m) => m.id === id) ?? null;
 };
