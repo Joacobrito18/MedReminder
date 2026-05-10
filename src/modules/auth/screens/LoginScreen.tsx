@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 
 import FormInput from '@/shared/components/FormInput';
-import PrimaryButton from '@/shared/components/PrimaryButton';
 import ScreenContainer from '@/shared/components/ScreenContainer';
-import { colors, fontSize, fontWeight, spacing } from '@/shared/constants/theme';
+import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import { AuthScreenProps } from '@/navigation/types';
 
@@ -24,26 +33,42 @@ const LoginScreen = ({ navigation }: AuthScreenProps<'Login'>) => {
     try {
       await signIn(username.trim().toLowerCase(), password);
     } catch (e) {
-      setError(e instanceof Error && e.message === 'INVALID_CREDENTIALS'
-        ? 'Usuario o contraseña incorrectos.'
-        : 'No pudimos iniciar sesión. Intentá de nuevo.');
+      setError(
+        e instanceof Error && e.message === 'INVALID_CREDENTIALS'
+          ? 'Usuario o contraseña incorrectos.'
+          : 'No pudimos iniciar sesión. Intentá de nuevo.',
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer padded={false}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
+        <View style={styles.hero}>
+          <View style={styles.logo}>
+            <Feather name="activity" size={28} color={colors.textOnPrimary} />
+          </View>
           <Text style={styles.title}>MedReminder</Text>
-          <Text style={styles.subtitle}>Iniciá sesión para gestionar tus medicaciones</Text>
+          <Text style={styles.subtitle}>Tu agenda de medicación, tranquila y a tiempo.</Text>
         </View>
 
-        <View>
+        <View style={styles.spacer} />
+
+        <View style={styles.formBlock}>
+          {error ? (
+            <View style={styles.errorBox}>
+              <View style={styles.errorBadge}>
+                <Text style={styles.errorBadgeText}>!</Text>
+              </View>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <FormInput
             label="Usuario"
             value={username}
@@ -62,20 +87,25 @@ const LoginScreen = ({ navigation }: AuthScreenProps<'Login'>) => {
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
           />
-          {error ? <Text style={styles.errorBox}>{error}</Text> : null}
 
-          <PrimaryButton
-            label="Entrar"
+          <Pressable
             onPress={handleSubmit}
-            loading={submitting}
             disabled={!canSubmit}
-            style={styles.submit}
-          />
+            accessibilityLabel="Entrar"
+            style={({ pressed }) => [
+              styles.primaryButton,
+              !canSubmit && styles.primaryButtonDisabled,
+              pressed && styles.primaryButtonPressed,
+            ]}
+          >
+            {submitting ? <ActivityIndicator color={colors.textOnPrimary} /> : null}
+            <Text style={styles.primaryLabel}>{submitting ? 'Entrando…' : 'Entrar'}</Text>
+          </Pressable>
         </View>
 
         <Pressable onPress={() => navigation.navigate('Register')} style={styles.footer}>
           <Text style={styles.footerText}>
-            ¿No tenés cuenta? <Text style={styles.footerLink}>Registrate</Text>
+            ¿Primera vez? <Text style={styles.footerLink}>Crear cuenta</Text>
           </Text>
         </Pressable>
       </KeyboardAvoidingView>
@@ -88,38 +118,105 @@ export default LoginScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl + spacing.md,
   },
-  header: {
+  hero: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl - 2,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
   title: {
-    fontSize: fontSize.xxl,
+    fontSize: 30,
     fontWeight: fontWeight.bold,
-    color: colors.primary,
+    color: colors.text,
+    letterSpacing: -0.8,
+    marginBottom: 6,
   },
   subtitle: {
-    marginTop: spacing.xs,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
     color: colors.textMuted,
     textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 280,
   },
-  submit: {
-    marginTop: spacing.md,
+  spacer: {
+    flex: 1,
+  },
+  formBlock: {
+    marginBottom: spacing.sm,
   },
   errorBox: {
-    marginBottom: spacing.sm,
+    backgroundColor: colors.dangerMuted,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    paddingHorizontal: spacing.md + 2,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: spacing.md + 2,
+  },
+  errorBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.pill,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  errorBadgeText: {
+    color: colors.textOnPrimary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+  },
+  errorText: {
+    flex: 1,
     color: colors.danger,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.sm + 1,
+    fontWeight: fontWeight.medium,
+    lineHeight: 20,
+  },
+  primaryButton: {
+    height: 54,
+    marginTop: spacing.md + 2,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.5,
+  },
+  primaryButtonPressed: {
+    opacity: 0.9,
+  },
+  primaryLabel: {
+    color: colors.textOnPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: -0.2,
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
   },
   footerText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.sm + 1,
     color: colors.textMuted,
   },
   footerLink: {

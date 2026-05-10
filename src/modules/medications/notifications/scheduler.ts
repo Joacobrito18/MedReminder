@@ -28,20 +28,41 @@ const parseTime = (time: string): { hour: number; minute: number } => {
   return { hour: Number(hourStr), minute: Number(minuteStr) };
 };
 
+export const tomorrowAt = (time: string, baseDate: Date = new Date()): Date => {
+  const { hour, minute } = parseTime(time);
+  const target = new Date(baseDate);
+  target.setDate(target.getDate() + 1);
+  target.setHours(hour, minute, 0, 0);
+  return target;
+};
+
 type SchedulableMed = Pick<Medication, 'name' | 'time' | 'dose'> | NewMedicationInput;
+
+const buildContent = (med: SchedulableMed) => ({
+  title: 'Hora de tu medicación',
+  body: med.dose ? `${med.name} — ${med.dose}` : med.name,
+  sound: 'default',
+});
 
 export const scheduleDaily = async (med: SchedulableMed): Promise<string> => {
   const { hour, minute } = parseTime(med.time);
   return Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Hora de tu medicación',
-      body: med.dose ? `${med.name} — ${med.dose}` : med.name,
-      sound: 'default',
-    },
+    content: buildContent(med),
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
+      channelId: Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined,
+    },
+  });
+};
+
+export const scheduleOneShot = async (med: SchedulableMed, date: Date): Promise<string> => {
+  return Notifications.scheduleNotificationAsync({
+    content: buildContent(med),
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date,
       channelId: Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined,
     },
   });
