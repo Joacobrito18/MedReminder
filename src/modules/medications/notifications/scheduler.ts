@@ -36,6 +36,22 @@ export const tomorrowAt = (time: string, baseDate: Date = new Date()): Date => {
   return target;
 };
 
+export const nextScheduledDate = (
+  time: string,
+  days: number[],
+  from: Date = new Date(),
+): Date => {
+  if (days.length === 0) return tomorrowAt(time, from);
+  const { hour, minute } = parseTime(time);
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = new Date(from);
+    candidate.setDate(candidate.getDate() + offset);
+    candidate.setHours(hour, minute, 0, 0);
+    if (days.includes(candidate.getDay())) return candidate;
+  }
+  return tomorrowAt(time, from);
+};
+
 type SchedulableMed = Pick<Medication, 'name' | 'time' | 'dose'> | NewMedicationInput;
 
 const buildContent = (med: SchedulableMed) => ({
@@ -44,17 +60,33 @@ const buildContent = (med: SchedulableMed) => ({
   sound: 'default',
 });
 
-export const scheduleDaily = async (med: SchedulableMed): Promise<string> => {
+const channelId = (): string | undefined =>
+  Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined;
+
+export const scheduleWeekly = async (med: SchedulableMed, day: number): Promise<string> => {
   const { hour, minute } = parseTime(med.time);
   return Notifications.scheduleNotificationAsync({
     content: buildContent(med),
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: day + 1,
       hour,
       minute,
-      channelId: Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined,
+      channelId: channelId(),
     },
   });
+};
+
+export const scheduleForDays = async (
+  med: SchedulableMed,
+  days: number[],
+): Promise<string[]> => {
+  const ids: string[] = [];
+  for (const day of days) {
+    const id = await scheduleWeekly(med, day);
+    ids.push(id);
+  }
+  return ids;
 };
 
 export const scheduleOneShot = async (med: SchedulableMed, date: Date): Promise<string> => {
@@ -63,7 +95,7 @@ export const scheduleOneShot = async (med: SchedulableMed, date: Date): Promise<
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date,
-      channelId: Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined,
+      channelId: channelId(),
     },
   });
 };
@@ -75,4 +107,9 @@ export const cancel = async (notificationId: string | undefined): Promise<void> 
   } catch {
     // Si la noti ya no existe, no es un error real.
   }
+};
+
+export const cancelMany = async (ids: string[] | undefined): Promise<void> => {
+  if (!ids || ids.length === 0) return;
+  await Promise.all(ids.map(cancel));
 };

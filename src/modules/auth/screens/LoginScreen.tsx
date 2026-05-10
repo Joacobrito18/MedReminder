@@ -75,7 +75,7 @@ const LoginScreen = ({ navigation }: AuthScreenProps<'Login'>) => {
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="tu_usuario"
+            placeholder="Usuario"
             returnKeyType="next"
           />
           <FormInput
@@ -83,7 +83,7 @@ const LoginScreen = ({ navigation }: AuthScreenProps<'Login'>) => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            placeholder="••••••"
+            placeholder="Contraseña"
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
           />
@@ -108,6 +108,8 @@ const LoginScreen = ({ navigation }: AuthScreenProps<'Login'>) => {
             ¿Primera vez? <Text style={styles.footerLink}>Crear cuenta</Text>
           </Text>
         </Pressable>
+
+        <View style={styles.bottomSpacer} />
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
@@ -120,6 +122,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxl + spacing.md,
+    paddingBottom: spacing.xxl + spacing.md,
   },
   hero: {
     alignItems: 'center',
@@ -154,6 +157,9 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
+  },
+  bottomSpacer: {
+    flex: 0.4,
   },
   formBlock: {
     marginBottom: spacing.sm,

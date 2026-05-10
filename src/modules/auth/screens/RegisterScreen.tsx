@@ -13,14 +13,16 @@ import Feather from '@expo/vector-icons/Feather';
 
 import FormInput from '@/shared/components/FormInput';
 import ScreenContainer from '@/shared/components/ScreenContainer';
+import { useToast } from '@/shared/components/Toast';
 import { colors, fontSize, fontWeight, radius, spacing } from '@/shared/constants/theme';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import { AuthScreenProps } from '@/navigation/types';
 
-const MIN_PASSWORD = 4;
+const MIN_PASSWORD = 6;
 
 const RegisterScreen = ({ navigation }: AuthScreenProps<'Register'>) => {
   const { signUp } = useAuth();
+  const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -32,7 +34,7 @@ const RegisterScreen = ({ navigation }: AuthScreenProps<'Register'>) => {
   }, [navigation]);
 
   const trimmedUsername = username.trim().toLowerCase();
-  const usernameValid = trimmedUsername.length >= 3;
+  const usernameValid = trimmedUsername.length >= 5;
   const passwordValid = password.length >= MIN_PASSWORD;
   const matches = password === confirm;
   const canSubmit = usernameValid && passwordValid && matches && !submitting;
@@ -40,13 +42,15 @@ const RegisterScreen = ({ navigation }: AuthScreenProps<'Register'>) => {
   const handleSubmit = async () => {
     Keyboard.dismiss();
     setError(null);
-    if (!usernameValid) return setError('El usuario debe tener al menos 3 caracteres.');
+    if (!usernameValid) return setError('El usuario debe tener al menos 5 caracteres.');
     if (!passwordValid) return setError(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.`);
     if (!matches) return setError('Las contraseñas no coinciden.');
 
     setSubmitting(true);
     try {
       await signUp(trimmedUsername, password);
+      showToast('Cuenta creada. Iniciá sesión.');
+      navigation.goBack();
     } catch (e) {
       setError(
         e instanceof Error && e.message === 'USERNAME_TAKEN'
@@ -97,14 +101,14 @@ const RegisterScreen = ({ navigation }: AuthScreenProps<'Register'>) => {
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="elegí un nombre"
+            placeholder="Nombre de usuario"
           />
           <FormInput
             label="Contraseña"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            placeholder={`mínimo ${MIN_PASSWORD} caracteres`}
+            placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
             hint="Se guarda solo en tu dispositivo."
           />
           <FormInput
@@ -112,7 +116,7 @@ const RegisterScreen = ({ navigation }: AuthScreenProps<'Register'>) => {
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry
-            placeholder="confirmá"
+            placeholder="Confirmar contraseña"
             onSubmitEditing={handleSubmit}
           />
         </View>
@@ -217,7 +221,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   footerBlock: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   primaryButton: {
     height: 54,
