@@ -34,6 +34,32 @@
           "icon": "./brand/icon.png",
           "color": "#2A4A87"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "MedReminder usa la cámara para que puedas tomarle una foto al medicamento.",
+          "photosPermission": "MedReminder accede a tus fotos para asociar una imagen al medicamento."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MedReminder usa tu ubicación para guardar la farmacia donde comprás el medicamento."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "MedReminder accede a tus contactos para asociar a tu médico o familiar al medicamento."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "MedReminder crea eventos en tu calendario para recordarte la toma del medicamento.",
+          "remindersPermission": "MedReminder crea recordatorios para la toma del medicamento."
+        }
       ]
     ]
   }

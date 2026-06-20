@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import {
   Animated,
+  Image,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -142,6 +143,9 @@ const MedicationItem = ({ medication, onDelete, onEdit, onToggleTaken }: Props) 
           </View>
 
           <View style={styles.body}>
+            {medication.photoUri ? (
+              <Image source={{ uri: medication.photoUri }} style={styles.thumb} />
+            ) : null}
             <View style={styles.info}>
               <Text
                 style={[styles.name, isTaken && styles.nameTaken]}
@@ -155,6 +159,16 @@ const MedicationItem = ({ medication, onDelete, onEdit, onToggleTaken }: Props) 
               <Text style={styles.days} numberOfLines={1}>
                 {formatDays(medication.days)}
               </Text>
+              {medication.pharmacy || medication.contact ? (
+                <View style={styles.metaRow}>
+                  {medication.pharmacy ? (
+                    <Feather name="map-pin" size={12} color={colors.textMutedSoft} />
+                  ) : null}
+                  {medication.contact ? (
+                    <Feather name="user" size={12} color={colors.textMutedSoft} />
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             <Pressable
@@ -273,9 +287,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  thumb: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+  },
   info: {
     flex: 1,
     minWidth: 0,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: spacing.xs + 2,
+    marginTop: 4,
   },
   name: {
     fontSize: fontSize.lg,

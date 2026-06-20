@@ -21,6 +21,53 @@ La opcion que elegi fue Recordatorio de medicación.
 - Permisos manejados con mensaje amigable si el usuario los rechaza.
 - Feedback rápido vía **toast** en alta, edición, eliminación y creación de cuenta.
 
+## Parcial 2 — Novedades
+
+Ampliación del Parcial 1 con acceso a recursos del dispositivo, testing automatizado y estado global.
+
+### Permisos y acceso a recursos del dispositivo
+
+Cada recurso pide su permiso **antes** de usarse y maneja los tres estados (concedido / pendiente /
+denegado). Si el permiso queda rechazado se muestra un mensaje claro y el flujo se cancela sin romper.
+La lógica está centralizada en `src/modules/device/`:
+
+| Recurso | Librería | Helper | Asociado a |
+|---|---|---|---|
+| Cámara / Galería | `expo-image-picker` | `device/image.ts` | **Foto del medicamento** |
+| Ubicación (GPS) | `expo-location` | `device/location.ts` | **Farmacia** (coords + dirección por reverse-geocoding) |
+| Contactos | `expo-contacts` | `device/contacts.ts` | **Médico / familiar** |
+| Calendario | `expo-calendar` | `device/calendar.ts` | **Evento de la toma** |
+
+El helper común `device/permissions.ts` (`ensurePermission`) unifica el manejo de estados y el mensaje.
+
+- **Cámara y galería:** desde el alta/edición se puede tomar una foto o elegir una de la galería. La
+  imagen se guarda en el medicamento y se muestra como **thumbnail en la lista** (Home) y en el detalle.
+- **Ubicación:** botón "Usar mi ubicación" → obtiene coordenadas y dirección aproximada de la farmacia.
+- **Contactos:** botón "Elegir contacto" → selector nativo, guarda nombre y teléfono del médico/familiar.
+- **Calendario:** botón "Agregar al calendario" → crea un evento en el calendario del dispositivo para
+  la próxima toma, con alarma.
+
+### Estado global con Zustand
+
+La lista de medicaciones se migró de `useState` + llamadas directas a storage hacia un **store global de
+Zustand** (`src/modules/medications/store/medications-store.ts`). El store orquesta la persistencia
+(AsyncStorage) y las notificaciones, y expone acciones `load`, `add`, `update`, `remove`, `toggleTaken`
+y selectores (`selectMeds`, `selectTakenCount`). `HomeScreen` y `AddMedicationScreen` leen y escriben el
+estado únicamente a través del store. (El `AuthContext` se mantuvo como estaba.)
+
+### Testing con Jest + React Native Testing Library
+
+3 suites (`*.test.ts(x)` en carpetas `__tests__/`):
+
+1. **Lógica de negocio** — `formatDays` (`src/shared/helpers/__tests__/format-days.test.ts`).
+2. **Componente reutilizable** — `<DayBanner />` (`src/modules/medications/components/__tests__/`).
+3. **Store global** — acciones del store Zustand (`src/modules/medications/store/__tests__/`), con
+   AsyncStorage y el scheduler mockeados.
+
+```bash
+npm test
+```
+
 ## Cómo correr
 
 ### Requisitos
@@ -126,8 +173,18 @@ Al eliminar se cancela la notificación programada también.
 
 Arriba a la derecha del Home hay un botón **Salir**. Te devuelve al Login. Tu cuenta y medicaciones quedan guardadas para la próxima vez.
 
+## Punto extra: IA aplicada al desarrollo
+
+Usé un asistente de IA en una **tarea puntual** (el selector de contactos con `expo-contacts`): el
+detalle de las herramientas, los prompts y la comparación entre el código generado y el integrado está
+en **[IA.md](IA.md)**.
+
 ## Demo
 
+**Parcial 1:**
 https://drive.google.com/file/d/1joBiFZgQqEpM-vlZeg7f5AsMJjqUx0pY/view?usp=sharing
 
 El video se ve rapido porque tuve que ponerlo en X2 debido a que me quedo un poco largo.
+
+**Parcial 2 (YouTube, ≤ 1 min):** _<agregar enlace del video nuevo mostrando permisos, cámara/galería,
+ubicación, contactos, calendario, testing y estado global>_
