@@ -8,6 +8,12 @@ export type AuthStackParamList = {
 export type AppStackParamList = {
   Home: undefined;
   AddMedication: { medicationId?: string } | undefined;
+  MedicationExtras: {
+    name: string;
+    dose?: string;
+    time: string;
+    days: number[];
+  };
 };
 
 export type AuthScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<

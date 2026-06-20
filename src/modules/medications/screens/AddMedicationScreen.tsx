@@ -25,11 +25,14 @@ import {
   scheduleOneShot,
 } from '@/modules/medications/notifications/scheduler';
 import {
-  addMedication,
   findMedication,
   removeMedication,
-  updateMedication,
 } from '@/modules/medications/storage/medications-storage';
+import {
+  selectHasAnyExtra,
+  useMedicationDraftStore,
+} from '@/modules/medications/store/medication-draft-store';
+import { useMedicationsStore } from '@/modules/medications/store/medications-store';
 import { ALL_DAYS, NotificationKind } from '@/modules/medications/types';
 import { wasTakenToday } from '@/shared/helpers/date';
 import { formatTime, timeToDate } from '@/shared/helpers/format-time';
@@ -58,6 +61,8 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
   const { state } = useAuth();
   const { showToast } = useToast();
   const username = state.status === 'signedIn' ? state.user.username : null;
+  const addMed = useMedicationsStore((s) => s.add);
+  const updateMed = useMedicationsStore((s) => s.update);
   const editingId = route.params?.medicationId;
   const isEditing = Boolean(editingId);
 
@@ -71,6 +76,12 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
   const [errors, setErrors] = useState<FieldErrors>({});
   const [originalNotificationIds, setOriginalNotificationIds] = useState<string[] | undefined>();
   const [originalLastTakenAt, setOriginalLastTakenAt] = useState<string | undefined>();
+
+  // Los "Adjuntos y recordatorio" viven en un draft store compartido con la
+  // pantalla MedicationExtras, así no se pierden al navegar entre ambas.
+  const hasExtras = useMedicationDraftStore(selectHasAnyExtra);
+  const initDraft = useMedicationDraftStore((s) => s.init);
+  const resetDraft = useMedicationDraftStore((s) => s.reset);
 
   const allSelected = days.length === 7;
   const sortedDays = [...days].sort((a, b) => a - b);
@@ -106,6 +117,12 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
       setDays(med.days.length > 0 ? med.days : ALL_DAYS);
       setOriginalNotificationIds(med.notificationIds);
       setOriginalLastTakenAt(med.lastTakenAt);
+      initDraft({
+        photoUri: med.photoUri,
+        pharmacy: med.pharmacy,
+        contact: med.contact,
+        calendarEventId: med.calendarEventId,
+      });
       setLoading(false);
     };
     load();
@@ -123,6 +140,22 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
     if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
   };
 
+  // En alta arrancamos con el draft vacío; en ambos casos lo limpiamos al salir.
+  useEffect(() => {
+    if (!isEditing) resetDraft();
+    return () => resetDraft();
+  }, [isEditing, resetDraft]);
+
+  const goToExtras = () => {
+    Keyboard.dismiss();
+    navigation.navigate('MedicationExtras', {
+      name: name.trim(),
+      dose: dose.trim() || undefined,
+      time,
+      days: sortedDays,
+    });
+  };
+
   const handleSave = async () => {
     if (!username) return;
 
@@ -136,6 +169,8 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
     const cleanName = name.trim();
     const cleanDose = dose.trim() || undefined;
     const cleanDays = sortedDays;
+    const { photoUri, pharmacy, contact, calendarEventId } =
+      useMedicationDraftStore.getState();
 
     setSubmitting(true);
     let newNotificationIds: string[] = [];
@@ -173,24 +208,32 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
 
       try {
         if (isEditing && editingId) {
-          await updateMedication(username, editingId, {
+          await updateMed(editingId, {
             name: cleanName,
             dose: cleanDose,
             time,
             days: cleanDays,
             notificationIds: newNotificationIds,
             notificationKind: newKind,
+            photoUri,
+            pharmacy,
+            contact,
+            calendarEventId,
           });
           await cancelMany(originalNotificationIds);
           showToast('Cambios guardados');
         } else {
-          await addMedication(username, {
+          await addMed({
             name: cleanName,
             dose: cleanDose,
             time,
             days: cleanDays,
             notificationIds: newNotificationIds,
             notificationKind: newKind,
+            photoUri,
+            pharmacy,
+            contact,
+            calendarEventId,
           });
           showToast('Recordatorio agregado');
         }
@@ -351,6 +394,27 @@ const AddMedicationScreen = ({ navigation, route }: AppScreenProps<'AddMedicatio
               })}
             </View>
             {errors.days ? <Text style={styles.error}>{errors.days}</Text> : null}
+
+            {/* Adjuntos y recordatorio (foto, farmacia, contacto, calendario) */}
+            <Pressable
+              onPress={goToExtras}
+              accessibilityLabel="Adjuntos y recordatorio"
+              style={({ pressed }) => [styles.extrasRow, pressed && styles.pressedSubtle]}
+            >
+              <View style={styles.extrasIcon}>
+                <Feather name="paperclip" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.extrasText}>
+                <Text style={styles.extrasTitle}>Adjuntos y recordatorio</Text>
+                <Text style={styles.extrasSubtitle} numberOfLines={1}>
+                  {hasExtras
+                    ? 'Foto, farmacia, contacto o evento cargados'
+                    : 'Foto, farmacia, médico y calendario (opcional)'}
+                </Text>
+              </View>
+              {hasExtras ? <View style={styles.extrasDot} /> : null}
+              <Feather name="chevron-right" size={20} color={colors.textMutedSoft} />
+            </Pressable>
           </View>
         </ScrollView>
       )}
@@ -508,6 +572,46 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontSize: fontSize.xs,
     color: colors.danger,
+  },
+  extrasRow: {
+    marginTop: spacing.lg + 4,
+    height: 64,
+    paddingHorizontal: spacing.md + 2,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  extrasIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  extrasText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  extrasTitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  extrasSubtitle: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+  },
+  extrasDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   daysHeader: {
     flexDirection: 'row',

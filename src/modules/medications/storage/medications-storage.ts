@@ -28,6 +28,10 @@ const migrate = (raw: LegacyMedication): Medication => {
     notificationKind: raw.notificationKind,
     lastTakenAt: raw.lastTakenAt,
     createdAt: raw.createdAt,
+    photoUri: raw.photoUri,
+    pharmacy: raw.pharmacy,
+    contact: raw.contact,
+    calendarEventId: raw.calendarEventId,
   };
 };
 
@@ -60,6 +64,10 @@ export const addMedication = async (
     days: input.days,
     notificationIds: input.notificationIds,
     notificationKind: input.notificationKind,
+    photoUri: input.photoUri,
+    pharmacy: input.pharmacy,
+    contact: input.contact,
+    calendarEventId: input.calendarEventId,
     createdAt: new Date().toISOString(),
   };
   await writeMedications(username, [...meds, med]);
