@@ -39,13 +39,24 @@ La lógica está centralizada en `src/modules/device/`:
 | Calendario | `expo-calendar` | `device/calendar.ts` | **Evento de la toma** |
 
 El helper común `device/permissions.ts` (`ensurePermission`) unifica el manejo de estados y el mensaje.
+Además, cada helper está envuelto en `try/catch`: si el acceso falla (GPS apagado, calendario no
+editable, etc.) se muestra un mensaje claro con `notifyResourceError` en vez de cortar la app.
 
-- **Cámara y galería:** desde el alta/edición se puede tomar una foto o elegir una de la galería. La
-  imagen se guarda en el medicamento y se muestra como **thumbnail en la lista** (Home) y en el detalle.
+- **Cámara y galería:** tomar una foto o elegir una de la galería. La imagen se guarda en el medicamento
+  y se muestra como **thumbnail en la lista** (Home) y en el detalle.
 - **Ubicación:** botón "Usar mi ubicación" → obtiene coordenadas y dirección aproximada de la farmacia.
 - **Contactos:** botón "Elegir contacto" → selector nativo, guarda nombre y teléfono del médico/familiar.
+  El nombre se reconstruye desde `firstName`/`lastName` cuando iOS no devuelve el campo `name`.
 - **Calendario:** botón "Agregar al calendario" → crea un evento en el calendario del dispositivo para
   la próxima toma, con alarma.
+
+### Pantalla "Adjuntos y recordatorio"
+
+Para no recargar el alta, lo indispensable (nombre, dosis, hora, días) quedó en la pantalla principal y
+los recursos del dispositivo se movieron a una **pantalla aparte** (`MedicationExtrasScreen`), a la que
+se entra desde una fila *"Adjuntos y recordatorio ›"*. Los datos en curso se comparten entre ambas
+pantallas mediante un **draft store** de Zustand (`medication-draft-store.ts`), así no se pierden al
+navegar; recién se persisten al guardar la medicación.
 
 ### Estado global con Zustand
 
@@ -53,7 +64,8 @@ La lista de medicaciones se migró de `useState` + llamadas directas a storage h
 Zustand** (`src/modules/medications/store/medications-store.ts`). El store orquesta la persistencia
 (AsyncStorage) y las notificaciones, y expone acciones `load`, `add`, `update`, `remove`, `toggleTaken`
 y selectores (`selectMeds`, `selectTakenCount`). `HomeScreen` y `AddMedicationScreen` leen y escriben el
-estado únicamente a través del store. (El `AuthContext` se mantuvo como estaba.)
+estado únicamente a través del store, y la pantalla de adjuntos usa el `medication-draft-store`.
+(El `AuthContext` se mantuvo como estaba.)
 
 ### Testing con Jest + React Native Testing Library
 
@@ -116,8 +128,9 @@ La primera vez te pide instalar `@expo/ngrok` — aceptá. El bundle es un poco 
 
 1. **Login** — usuario + contraseña; link a registro.
 2. **Registro** — usuario (mín. 5), contraseña + confirmación (mín. 6); valida unicidad. Después del registro vuelve al Login.
-3. **Home** — banner con progreso del día, lista de medicaciones del usuario logueado, FAB para agregar, header con saludo y botón de salir.
-4. **Alta / Edición** — form con nombre, dosis (opcional), hora (TimePicker nativo) y selector de días de la semana.
+3. **Home** — banner con progreso del día, lista de medicaciones del usuario logueado (con thumbnail de la foto si la tiene), FAB para agregar, header con saludo y botón de salir.
+4. **Alta / Edición** — form con nombre, dosis (opcional), hora (TimePicker nativo) y selector de días + acceso a "Adjuntos y recordatorio".
+5. **Adjuntos y recordatorio** — foto del medicamento, ubicación de la farmacia, contacto del médico/familiar y evento en el calendario.
 
 ## Cómo usar la app
 
@@ -145,7 +158,8 @@ Si lo rechazaste sin querer, andá a Ajustes del celular → Apps → Expo Go �
   - **Dosis** (opcional): ej. "400mg" o "1 comprimido".
   - **Hora**: tocá la card azul para abrir el TimePicker nativo y elegí la hora.
   - **Días de la semana**: por default vienen los 7 seleccionados. Tocá un chip para des/seleccionarlo, o usá **"Todos / Ninguno"** para alternar todos a la vez. Tiene que haber al menos uno marcado.
-- Tocá **Crear recordatorio**. Vuelve al Home con un toast de confirmación y la medicación aparece en la lista, ordenada por hora.
+- (Opcional) Tocá **"Adjuntos y recordatorio ›"** para sumarle una **foto**, la **ubicación de la farmacia**, un **contacto** (médico/familiar) y un **evento en el calendario**. La primera vez, el celular te va a pedir el permiso de cada recurso. Tocá **Listo** para volver.
+- Tocá **Crear recordatorio**. Vuelve al Home con un toast de confirmación y la medicación aparece en la lista, ordenada por hora (con el thumbnail de la foto si le pusiste una).
 
 > **Tip para probar las notis ya:** poné una hora 2-3 minutos en el futuro, dejá los 7 días marcados, bloqueá el celu, y esperá.
 
@@ -177,14 +191,12 @@ Arriba a la derecha del Home hay un botón **Salir**. Te devuelve al Login. Tu c
 
 Usé un asistente de IA en una **tarea puntual** (el selector de contactos con `expo-contacts`): el
 detalle de las herramientas, los prompts y la comparación entre el código generado y el integrado está
-en **[IA.md](IA.md)**.
+en **[Punto Extra IA.md](IA.md)**.
 
 ## Demo
 
 **Parcial 1:**
 https://drive.google.com/file/d/1joBiFZgQqEpM-vlZeg7f5AsMJjqUx0pY/view?usp=sharing
 
-El video se ve rapido porque tuve que ponerlo en X2 debido a que me quedo un poco largo.
-
-**Parcial 2 (YouTube, ≤ 1 min):** _<agregar enlace del video nuevo mostrando permisos, cámara/galería,
-ubicación, contactos, calendario, testing y estado global>_
+**Parcial 2:**
+https://drive.google.com/file/d/1lr_uZULbKqlJBFahGs3QORPX96ntPCde/view?usp=drive_link
