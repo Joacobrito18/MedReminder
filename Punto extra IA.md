@@ -1,6 +1,5 @@
 # Punto extra: IA aplicada al desarrollo
 
-
 ## Herramienta utilizada
 
 - **Claude Code** corriendo dentro del editor, con acceso al repo para leer y proponer cambios.
@@ -50,14 +49,3 @@ excepción sin capturar** —por ejemplo si el GPS está apagado o el calendario
 podía romper la app. A partir de eso envolví cada helper en `try/catch`, devolviendo `null` y mostrando
 un mensaje claro con un helper común `notifyResourceError` ([`src/modules/device/permissions.ts`](src/modules/device/permissions.ts)).
 Yo decidí cuáles sugerencias aplicar (apliqué la de robustez y dejé otras de lado).
-
-## Comparación: código generado vs. integrado
-
-| Versión generada (1er intento) | Versión final integrada |
-|---|---|
-| Usaba directamente `contact.name`, con `'Contacto sin nombre'` como único respaldo | Agrega `resolveName()` que arma el nombre desde `firstName`/`lastName` y otros campos, porque iOS no siempre devuelve `name` |
-| Funcionaba en teoría | Se ajustó **después de probarlo en un iPhone real** |
-
-**Conclusión:** la IA sirvió para arrancar rápido con el boilerplate de `expo-contacts`, pero la versión
-que quedó en la app necesitó **probarla en el dispositivo y corregirla** a partir del comportamiento
-real. El criterio sobre qué estaba mal y cómo validarlo fue mío; la IA aceleró la escritura.
