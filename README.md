@@ -199,4 +199,4 @@ en **[Punto Extra IA.md](IA.md)**.
 https://drive.google.com/file/d/1joBiFZgQqEpM-vlZeg7f5AsMJjqUx0pY/view?usp=sharing
 
 **Parcial 2:**
-https://drive.google.com/file/d/1lr_uZULbKqlJBFahGs3QORPX96ntPCde/view?usp=drive_link
+https://drive.google.com/file/d/1lr_uZULbKqlJBFahGs3QORPX96ntPCde/view?usp=sharing
