@@ -204,7 +204,7 @@ https://drive.google.com/file/d/1joBiFZgQqEpM-vlZeg7f5AsMJjqUx0pY/view?usp=shari
 **Parcial 2:**
 https://drive.google.com/file/d/1lr_uZULbKqlJBFahGs3QORPX96ntPCde/view?usp=sharing
 
-
+Como no se podia ver el Punto Extra IA.md dejo aca pegado en el readme lo que estaba en ese archivo
 
 # Punto extra: IA aplicada al desarrollo
 
